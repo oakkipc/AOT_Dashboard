@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
-// 1. กำหนด Interface เพื่อป้องกัน Error ตอน Deploy (Vercel จะได้ไม่ด่าเรื่อง Type)
+// 1. กำหนด Interface เพื่อป้องกัน Error ตอน Deploy
 interface TradingAccount {
   account_id: string | number;
   account_name: string;
@@ -52,7 +52,7 @@ export default function Home() {
     const lastUpdate = new Date(updatedAt).getTime();
     const currentTime = now.getTime();
     const diffInSeconds = Math.abs((currentTime - lastUpdate) / 1000);
-    const offset7Hours = 25200;
+    const offset7Hours = 25200; // เผื่อ Timezone 7 ชม.
     const actualDiff = diffInSeconds > 20000 ? Math.abs(diffInSeconds - offset7Hours) : diffInSeconds;
     return actualDiff > 180; 
   }
@@ -61,7 +61,7 @@ export default function Home() {
     setIsMounted(true)
     fetchAccounts()
     const timer = setInterval(() => setNow(new Date()), 10000)
-    const channel = supabase.channel('aot_v19').on('postgres_changes', { event: '*', schema: 'public', table: 'trading_accounts' }, () => fetchAccounts()).subscribe()
+    const channel = supabase.channel('aot_final').on('postgres_changes', { event: '*', schema: 'public', table: 'trading_accounts' }, () => fetchAccounts()).subscribe()
     return () => { clearInterval(timer); supabase.removeChannel(channel); }
   }, [])
 
@@ -83,14 +83,31 @@ export default function Home() {
     <main className="min-h-screen bg-[#020617] text-slate-200 p-4 md:p-6 font-sans uppercase tracking-tight">
       <div className="max-w-[1800px] mx-auto">
         
-        {/* HEADER */}
+        {/* HEADER - รวมปุ่มเลือกคอลัมน์กลับมา */}
         <div className="flex flex-row items-center justify-between mb-8 bg-slate-900/40 p-4 px-8 rounded-full border border-slate-800 backdrop-blur-xl shadow-2xl overflow-x-auto no-scrollbar">
           <div className="flex items-center gap-6 shrink-0">
             <h1 className="text-xl font-black text-white tracking-tighter border-r border-slate-700 pr-4">AOT TERMINAL</h1>
+            
+            {/* ปุ่มสลับโหมด */}
             <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 scale-90">
               <button onClick={() => setViewMode('grid')} className={`px-4 py-1.5 rounded-lg text-[9px] font-bold transition-all ${viewMode === 'grid' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500'}`}>CARDS</button>
               <button onClick={() => setViewMode('table')} className={`px-4 py-1.5 rounded-lg text-[9px] font-bold transition-all ${viewMode === 'table' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500'}`}>TABLE</button>
             </div>
+
+            {/* ปุ่มเลือกจำนวนคอลัมน์ (แสดงเฉพาะ Grid) */}
+            {viewMode === 'grid' && (
+              <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 gap-1 scale-90">
+                {[1, 2, 3, 4].map((n) => (
+                  <button 
+                    key={n} 
+                    onClick={() => setCols(n)} 
+                    className={`w-8 h-8 rounded-lg text-[10px] font-bold transition-all ${cols === n ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-6 shrink-0 text-right">
@@ -113,21 +130,21 @@ export default function Home() {
               const color = acc.is_usc ? 'text-amber-500' : 'text-blue-400'
               
               return (
-                <div key={acc.account_id} className={`relative transition-all duration-500 bg-slate-900 border-2 rounded-[2.5rem] p-8 shadow-2xl ${offline ? 'border-red-500/40' : 'border-slate-800'} ${acc.is_demo ? 'opacity-80' : ''}`}>
+                <div key={acc.account_id} className={`relative transition-all duration-500 bg-slate-900 border-2 rounded-[2.5rem] p-8 shadow-2xl ${offline ? 'border-red-500/40' : 'border-slate-800 hover:border-blue-500/50'} ${acc.is_demo ? 'opacity-80' : ''}`}>
                   {acc.is_demo && <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-amber-500 text-black text-[9px] font-black px-4 py-1 rounded-b-xl">DEMO</div>}
                   
                   <div className="flex justify-between items-start mb-6">
                     <div>
                       <h2 className={`text-xl font-black truncate ${offline ? 'text-red-400' : 'text-white'}`}>{acc.account_name}</h2>
-                      <p className="text-slate-500 text-[10px] font-mono mt-1 uppercase">ID: {acc.account_id}</p>
+                      <p className="text-slate-500 text-[10px] font-mono mt-1">ID: {acc.account_id}</p>
                     </div>
                     <div className={`px-2 py-1 rounded-full border text-[8px] font-black ${offline ? 'text-red-500 border-red-500/20' : 'text-emerald-400 border-emerald-500/20'}`}>{offline ? 'OFFLINE' : 'LIVE'}</div>
                   </div>
 
                   <div className="text-center mb-10">
-                    <p className={`${color} text-[10px] font-black mb-2 tracking-widest uppercase`}>Equity</p>
+                    <p className={`${color} text-[10px] font-black mb-2 tracking-widest uppercase`}>Current Equity</p>
                     <div className="flex items-baseline justify-center gap-2">
-                      <span className={`${cols >= 3 ? 'text-5xl' : 'text-7xl'} font-mono font-black tracking-tighter text-white leading-none`}>
+                      <span className={`${cols >= 3 ? 'text-4xl' : 'text-6xl'} font-mono font-black tracking-tighter text-white leading-none`}>
                         {acc.equity.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </span>
                       <span className={`${color} text-xl font-black`}>{unit}</span>

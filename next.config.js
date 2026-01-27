@@ -1,9 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // สั่งให้ Vercel มองข้าม Error ของ TypeScript และ ESLint เพื่อให้ Build ผ่าน
   typescript: {
     ignoreBuildErrors: true,
   },
+  // ปรับการตั้งค่าตามมาตรฐาน Next.js 16
   eslint: {
     ignoreDuringBuilds: true,
   },
