@@ -21,10 +21,22 @@ const supabase = createClient(
 
 export default function Home() {
   const [accounts, setAccounts] = useState<TradingAccount[]>([])
+  const [goldPrice, setGoldPrice] = useState<number | null>(null)
   const [now, setNow] = useState(new Date())
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
   const [cols, setCols] = useState<number>(3)
   const [isMounted, setIsMounted] = useState(false)
+
+  // 1. ดึงราคาทองจาก Binance API (PAXG คือ Gold Spot Token)
+  const fetchGoldPrice = async () => {
+    try {
+      const res = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT');
+      const data = await res.json();
+      if (data.price) setGoldPrice(parseFloat(data.price));
+    } catch (e) {
+      console.error("Gold API Error:", e);
+    }
+  }
 
   const fetchAccounts = async () => {
     const { data, error } = await supabase.from('trading_accounts').select('*')
@@ -37,57 +49,39 @@ export default function Home() {
         }
         return acc;
       }, []);
-
-      const sortedData = uniqueData.sort((a, b) => {
-        if (a.is_demo !== b.is_demo) return a.is_demo ? 1 : -1;
-        return String(a.account_id).localeCompare(String(b.account_id), undefined, { numeric: true });
-      });
-      setAccounts(sortedData)
+      setAccounts(uniqueData.sort((a, b) => a.is_demo ? 1 : -1))
     }
   }
 
   const isStale = (updatedAt: string) => {
     if (!updatedAt) return true;
-    const lastUpdate = new Date(updatedAt).getTime();
-    const currentTime = now.getTime();
-    const diffInSeconds = Math.abs((currentTime - lastUpdate) / 1000);
-    const offset7Hours = 25200; 
-    const actualDiff = diffInSeconds > 20000 ? Math.abs(diffInSeconds - offset7Hours) : diffInSeconds;
-    return actualDiff > 180; 
+    const diff = Math.abs((now.getTime() - new Date(updatedAt).getTime()) / 1000);
+    const actualDiff = diff > 20000 ? Math.abs(diff - 25200) : diff;
+    return actualDiff > 180;
   }
 
   useEffect(() => {
     setIsMounted(true)
     
-    // 🔥 เช็คขนาดหน้าจอเพื่อกำหนดค่า Default ทันทีที่โหลด
-    const handleInitialView = () => {
-      if (window.innerWidth < 768) {
-        setViewMode('table');
-        setCols(1);
-      } else {
-        setViewMode('grid');
-        setCols(3);
-      }
-    };
-    handleInitialView();
+    // ตั้งค่าเริ่มต้นตามขนาดหน้าจอ
+    if (window.innerWidth < 768) setViewMode('table');
 
     fetchAccounts()
+    fetchGoldPrice()
+
     const timer = setInterval(() => setNow(new Date()), 10000)
-    const channel = supabase.channel('aot_final_v3').on('postgres_changes', { event: '*', schema: 'public', table: 'trading_accounts' }, () => fetchAccounts()).subscribe()
-    return () => { clearInterval(timer); supabase.removeChannel(channel); }
+    const goldTimer = setInterval(fetchGoldPrice, 30000) // อัปเดกราคาทองทุก 30 วิ
+
+    const channel = supabase.channel('aot_final').on('postgres_changes', { event: '*', schema: 'public', table: 'trading_accounts' }, () => fetchAccounts()).subscribe()
+    
+    return () => { 
+      clearInterval(timer); 
+      clearInterval(goldTimer);
+      supabase.removeChannel(channel); 
+    }
   }, [])
 
-  const totalEquityUSD = accounts.reduce((sum, a) => {
-    if (a.is_demo) return sum;
-    return sum + (a.is_usc ? (a.equity || 0) / 100 : (a.equity || 0))
-  }, 0)
-
-  const formatThaiTime = (dateString: string) => {
-    if (!isMounted || !dateString) return "--:--:--";
-    return new Date(dateString).toLocaleTimeString('th-TH', {
-      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
-    });
-  };
+  const totalEquityUSD = accounts.reduce((sum, a) => a.is_demo ? sum : sum + (a.is_usc ? a.equity / 100 : a.equity), 0)
 
   if (!isMounted) return null;
 
@@ -97,66 +91,61 @@ export default function Home() {
         
         {/* HEADER */}
         <div className="flex flex-col md:flex-row items-center justify-between mb-6 bg-slate-900/40 p-4 md:px-8 rounded-[2rem] md:rounded-full border border-slate-800 backdrop-blur-xl shadow-2xl gap-4">
-          <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
-            <h1 className="text-lg md:text-xl font-black text-white tracking-tighter md:border-r border-slate-700 md:pr-4">AOT TERMINAL</h1>
+          <div className="flex items-center gap-4 w-full md:w-auto justify-between">
+            <h1 className="text-lg font-black text-white tracking-tighter">AOT TERMINAL</h1>
             
-            <div className="flex gap-4 items-center">
-              <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 scale-90">
-                <button onClick={() => setViewMode('grid')} className={`px-3 py-1.5 rounded-lg text-[9px] font-bold transition-all ${viewMode === 'grid' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500'}`}>CARDS</button>
-                <button onClick={() => setViewMode('table')} className={`px-3 py-1.5 rounded-lg text-[9px] font-bold transition-all ${viewMode === 'table' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500'}`}>TABLE</button>
-              </div>
-
-              {viewMode === 'grid' && (
-                <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 gap-1 scale-90">
-                  {[1, 2, 3, 4].map((n) => (
-                    <button key={n} onClick={() => setCols(n)} className={`w-7 h-7 md:w-8 md:h-8 rounded-lg text-[10px] font-bold transition-all ${cols === n ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>{n}</button>
-                  ))}
-                </div>
-              )}
+            {/* GOLD PRICE TICKER */}
+            <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
+               <span className="text-[8px] font-black text-amber-500 tracking-widest">XAUUSD</span>
+               <span className="text-sm font-mono font-bold text-white">
+                 {goldPrice ? goldPrice.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '---.--'}
+               </span>
+               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
             </div>
           </div>
 
-          <div className="text-right p-2">
-            <p className="text-blue-400 text-[9px] font-black tracking-[0.2em] mb-0.5 opacity-80">NET REAL EQUITY</p>
-            <p className="text-2xl md:text-3xl font-mono font-bold text-white tracking-tighter leading-none">
-              {totalEquityUSD.toLocaleString(undefined, { minimumFractionDigits: 2 })} <span className="text-blue-400 text-sm">USD</span>
-            </p>
+          <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+            <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 scale-90">
+              <button onClick={() => setViewMode('grid')} className={`px-3 py-1.5 rounded-lg text-[9px] font-bold ${viewMode === 'grid' ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>CARDS</button>
+              <button onClick={() => setViewMode('table')} className={`px-3 py-1.5 rounded-lg text-[9px] font-bold ${viewMode === 'table' ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>TABLE</button>
+            </div>
+
+            <div className="text-right border-l border-slate-800 pl-4">
+              <p className="text-blue-400 text-[8px] font-black opacity-80">NET EQUITY</p>
+              <p className="text-xl font-mono font-bold text-white leading-none">
+                {totalEquityUSD.toLocaleString(undefined, { minimumFractionDigits: 2 })} <span className="text-xs">USD</span>
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* VIEW: TABLE (Optimized for Mobile) */}
+        {/* VIEW: TABLE (Mobile-Optimized) */}
         {viewMode === 'table' && (
-          <div className="bg-slate-900 border border-slate-800 rounded-[1.5rem] overflow-hidden shadow-2xl">
-            <table className="w-full text-left border-collapse table-fixed uppercase">
+          <div className="bg-slate-900 border border-slate-800 rounded-[1.5rem] overflow-hidden">
+            <table className="w-full text-left border-collapse table-fixed">
               <thead className="bg-slate-950 text-[9px] font-black text-slate-500 border-b border-slate-800">
                 <tr>
-                  <th className="p-4 w-[35%] md:w-[40%]">PORTFOLIO</th>
-                  <th className="p-4 text-right w-[40%] md:w-[40%]">EQUITY / BAL</th>
-                  <th className="p-4 text-center w-[25%] md:w-[20%] text-red-400">DD%</th>
+                  <th className="p-4 w-[35%]">PORTFOLIO</th>
+                  <th className="p-4 text-right w-[40%]">EQUITY / BAL</th>
+                  <th className="p-4 text-center w-[25%] text-red-400">DD%</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/50">
+              <tbody className="divide-y divide-slate-800/50 text-[11px] md:text-sm">
                 {accounts.map((acc) => {
-                  const ddPct = acc.balance > 0 ? ((acc.equity - acc.balance) / acc.balance) * 100 : 0
-                  const unit = acc.is_usc ? 'USC' : 'USD'
-                  const color = acc.is_usc ? 'text-amber-500' : 'text-blue-400'
-                  
+                  const dd = acc.balance > 0 ? ((acc.equity - acc.balance) / acc.balance) * 100 : 0
+                  const u = acc.is_usc ? 'USC' : 'USD'
                   return (
-                    <tr key={acc.account_id} className={`hover:bg-slate-800/30 transition-colors ${acc.is_demo ? 'bg-slate-900/40' : ''}`}>
+                    <tr key={acc.account_id} className={acc.is_demo ? 'opacity-60' : ''}>
                       <td className="p-4 overflow-hidden">
-                        <p className="font-bold text-white text-[11px] md:text-sm truncate leading-tight">{acc.account_name}</p>
-                        <p className="text-[8px] text-slate-500 font-mono opacity-60 truncate">ID: {acc.account_id}</p>
+                        <p className="font-bold text-white truncate">{acc.account_name}</p>
+                        <p className="text-[8px] text-slate-500 font-mono">ID: {acc.account_id}</p>
                       </td>
-                      <td className="p-4 text-right font-mono">
-                        <div className="font-bold text-white text-[11px] md:text-base whitespace-nowrap">
-                          {acc.equity.toLocaleString(undefined, {minimumFractionDigits: 1})} <span className={`${color} text-[8px] md:text-[10px]`}>{unit}</span>
-                        </div>
-                        <div className="text-[8px] md:text-[10px] text-slate-500 font-medium whitespace-nowrap opacity-60">
-                          {acc.balance.toLocaleString(undefined, {minimumFractionDigits: 1})}
-                        </div>
+                      <td className="p-4 text-right font-mono font-bold">
+                        <div className="text-white">{acc.equity.toLocaleString(undefined, {minimumFractionDigits: 1})} <span className="text-[8px] text-slate-500">{u}</span></div>
+                        <div className="text-[9px] text-slate-500 opacity-60">{acc.balance.toLocaleString()}</div>
                       </td>
-                      <td className={`p-4 text-center font-mono font-bold text-sm md:text-lg ${ddPct < 0 ? 'text-red-500' : 'text-emerald-400'}`}>
-                        {ddPct.toFixed(1)}%
+                      <td className={`p-4 text-center font-mono font-bold ${dd < 0 ? 'text-red-500' : 'text-emerald-400'}`}>
+                        {dd.toFixed(1)}%
                       </td>
                     </tr>
                   )
@@ -168,48 +157,36 @@ export default function Home() {
 
         {/* VIEW: GRID (Cards) */}
         {viewMode === 'grid' && (
-          <div className={`grid gap-4 md:gap-6 grid-cols-1 ${cols === 2 ? 'md:grid-cols-2' : cols === 3 ? 'md:grid-cols-2 lg:grid-cols-3' : cols === 4 ? 'md:grid-cols-2 lg:grid-cols-4' : ''}`}>
+          <div className={`grid gap-4 md:gap-6 grid-cols-1 md:grid-cols-${cols}`}>
             {accounts.map((acc) => {
               const offline = isStale(acc.updated_at)
-              const balance = acc.balance || 0
-              const equity = acc.equity || 0
-              const ddPct = balance > 0 ? ((equity - balance) / balance) * 100 : 0
-              const unit = acc.is_usc ? 'USC' : 'USD'
+              const dd = acc.balance > 0 ? ((acc.equity - acc.balance) / acc.balance) * 100 : 0
+              const u = acc.is_usc ? 'USC' : 'USD'
               const color = acc.is_usc ? 'text-amber-500' : 'text-blue-400'
-              
               return (
-                <div key={acc.account_id} className={`relative transition-all duration-500 bg-slate-900 border-2 rounded-[2.5rem] p-6 md:p-8 shadow-2xl ${offline ? 'border-red-500/40' : 'border-slate-800'}`}>
-                  <div className="flex justify-between items-start mb-4 md:mb-6">
-                    <div className="max-w-[70%]">
-                      <h2 className={`text-base md:text-xl font-black truncate ${offline ? 'text-red-400' : 'text-white'}`}>{acc.account_name}</h2>
-                      <p className="text-slate-500 text-[10px] font-mono mt-0.5">ID: {acc.account_id}</p>
+                <div key={acc.account_id} className={`bg-slate-900 border-2 rounded-[2rem] p-6 shadow-2xl ${offline ? 'border-red-500/40' : 'border-slate-800'}`}>
+                  <div className="flex justify-between items-start mb-6 uppercase">
+                    <div>
+                      <h2 className="text-base font-black text-white truncate max-w-[150px]">{acc.account_name}</h2>
+                      <p className="text-[9px] text-slate-500 font-mono">ID: {acc.account_id}</p>
                     </div>
                     <div className={`px-2 py-0.5 rounded-full border text-[8px] font-black ${offline ? 'text-red-500 border-red-500/20' : 'text-emerald-400 border-emerald-500/20'}`}>{offline ? 'OFFLINE' : 'LIVE'}</div>
                   </div>
-
-                  <div className="text-center mb-6 md:mb-8">
-                    <p className={`${color} text-[9px] md:text-[10px] font-black mb-1 md:mb-2 tracking-widest opacity-80`}>CURRENT EQUITY</p>
-                    <div className="flex items-baseline justify-center gap-1 md:gap-2">
-                      <span className={`${cols >= 3 ? 'text-4xl md:text-5xl' : 'text-5xl md:text-7xl'} font-mono font-black tracking-tighter text-white leading-none`}>
-                        {equity.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                      </span>
-                      <span className={`${color} text-sm md:text-xl font-black`}>{unit}</span>
+                  <div className="text-center mb-6">
+                    <p className={`${color} text-[9px] font-black mb-1 opacity-80 uppercase tracking-widest`}>Equity</p>
+                    <div className="flex items-baseline justify-center gap-1">
+                      <span className="text-4xl font-mono font-black text-white leading-none">{acc.equity.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      <span className={`${color} text-sm font-black`}>{u}</span>
                     </div>
-                    <div className="mt-2 flex items-center justify-center gap-2 opacity-40 text-xs font-mono font-bold">
-                      <span className="text-slate-400">BAL:</span>
-                      <span>{balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                      <span className="text-[10px]">{unit}</span>
-                    </div>
+                    <div className="mt-2 text-[10px] font-mono font-bold text-slate-500 opacity-60 uppercase">BAL: {acc.balance.toLocaleString()} {u}</div>
                   </div>
-
-                  <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800/50 text-center mb-4 md:mb-6">
-                    <p className="text-[8px] md:text-[9px] text-slate-500 font-black mb-1 tracking-widest">DRAWDOWN</p>
-                    <p className={`text-xl md:text-2xl font-bold font-mono ${ddPct < 0 ? 'text-red-500' : 'text-emerald-400'}`}>{ddPct.toFixed(2)}%</p>
+                  <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800/50 text-center mb-4">
+                    <p className="text-[8px] text-slate-500 font-black mb-1 uppercase tracking-widest">Drawdown</p>
+                    <p className={`text-2xl font-bold font-mono ${dd < 0 ? 'text-red-500' : 'text-emerald-400'}`}>{dd.toFixed(2)}%</p>
                   </div>
-
-                  <div className="flex justify-between text-[9px] font-bold text-slate-600 border-t border-slate-800/40 pt-4">
-                    <span>LOTS: {acc.total_lots?.toFixed(2)}</span>
-                    <span className="font-mono text-slate-500 italic">SYNC: {formatThaiTime(acc.updated_at)}</span>
+                  <div className="flex justify-between text-[9px] font-bold text-slate-600 border-t border-slate-800/40 pt-4 uppercase">
+                    <span>LOTS: {acc.total_lots?.toFixed(2) || '0.00'}</span>
+                    <span className="font-mono opacity-60">{new Date(acc.updated_at).toLocaleTimeString('th-TH', { hour12: false })}</span>
                   </div>
                 </div>
               )
