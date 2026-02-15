@@ -82,6 +82,12 @@ export default function Home() {
     setSortConfig({ key, direction });
   }
 
+  const toggleCurrency = async (acc: TradingAccount) => {
+    const newIsUsc = !acc.is_usc
+    await supabase.from('trading_accounts').update({ is_usc: newIsUsc }).eq('account_id', acc.account_id)
+    setAccounts(prev => prev.map(a => a.account_id === acc.account_id ? { ...a, is_usc: newIsUsc } : a))
+  }
+
   const deleteAccount = async () => {
     if (!deleteTarget) return
     const { error } = await supabase.from('trading_accounts').delete().eq('account_id', deleteTarget.account_id)
@@ -177,7 +183,10 @@ export default function Home() {
                       <td className="p-4 text-right font-mono font-bold"><div className="text-white">{acc.equity.toLocaleString(undefined, {minimumFractionDigits: 2})} <span className="text-[8px] text-slate-500">{acc.is_usc ? 'USC' : 'USD'}</span></div><div className="text-[9px] text-slate-500 opacity-60">{acc.balance.toLocaleString()}</div></td>
                       <td className={`p-4 text-center font-mono font-bold ${dd < 0 ? 'text-red-500' : 'text-emerald-400'}`}>{dd.toFixed(1)}%</td>
                       <td className="p-4 text-center">
-                        <button onClick={() => setDeleteTarget(acc)} className="px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-[9px] font-black hover:bg-red-500/20 hover:border-red-500/40 transition-all">DEL</button>
+                        <div className="flex items-center justify-center gap-2">
+                          <button onClick={() => toggleCurrency(acc)} className={`px-2.5 py-1 rounded-lg border text-[9px] font-black transition-all ${acc.is_usc ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20' : 'bg-blue-500/10 border-blue-500/30 text-blue-400 hover:bg-blue-500/20'}`}>{acc.is_usc ? 'USC' : 'USD'}</button>
+                          <button onClick={() => setDeleteTarget(acc)} className="px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-[9px] font-black hover:bg-red-500/20 hover:border-red-500/40 transition-all">DEL</button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -208,7 +217,10 @@ export default function Home() {
                       <h2 className={`text-base font-black truncate ${cols >= 3 ? 'max-w-[120px]' : 'max-w-[200px]'} ${offline ? 'text-red-400' : 'text-white'}`}>{acc.account_name}</h2>
                       <p className="text-[9px] text-slate-500 font-mono">ID: {acc.account_id}</p>
                     </div>
-                    <div className={`px-2 py-0.5 rounded-full border text-[8px] font-black ${offline ? 'text-red-500 border-red-500/20' : 'text-emerald-400 border-emerald-500/20'}`}>{offline ? 'OFFLINE' : 'LIVE'}</div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => toggleCurrency(acc)} className={`px-2.5 py-0.5 rounded-full border text-[8px] font-black transition-all ${acc.is_usc ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20' : 'bg-blue-500/10 border-blue-500/30 text-blue-400 hover:bg-blue-500/20'}`}>{acc.is_usc ? 'USC' : 'USD'}</button>
+                      <div className={`px-2 py-0.5 rounded-full border text-[8px] font-black ${offline ? 'text-red-500 border-red-500/20' : 'text-emerald-400 border-emerald-500/20'}`}>{offline ? 'OFFLINE' : 'LIVE'}</div>
+                    </div>
                   </div>
                   
                   <div className="text-center mb-6">
