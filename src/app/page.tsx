@@ -247,15 +247,15 @@ export default function Home() {
               <div className="w-14 h-14 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <svg className="w-7 h-7 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
               </div>
-              <h3 className="text-lg font-black text-white uppercase tracking-tight">ยืนยันการลบ</h3>
-              <p className="text-sm text-slate-400 mt-2">คุณต้องการลบพอร์ท</p>
+              <h3 className="text-lg font-black text-white uppercase tracking-tight">CONFIRM DELETE</h3>
+              <p className="text-sm text-slate-400 mt-2">You are about to delete</p>
               <p className="text-base font-black text-red-400 mt-1">{deleteTarget.account_name}</p>
               <p className="text-[10px] text-slate-500 font-mono mt-1">ID: {deleteTarget.account_id}</p>
-              <p className="text-xs text-slate-500 mt-3">ข้อมูลจะถูกลบออกจากระบบถาวร</p>
+              <p className="text-xs text-slate-500 mt-3">This action is permanent and cannot be undone.</p>
             </div>
             <div className="flex gap-3">
-              <button onClick={() => setDeleteTarget(null)} className="flex-1 py-3 rounded-2xl bg-slate-800 border border-slate-700 text-slate-300 text-sm font-bold hover:bg-slate-700 transition-all">ยกเลิก</button>
-              <button onClick={deleteAccount} className="flex-1 py-3 rounded-2xl bg-red-600 border border-red-500 text-white text-sm font-bold hover:bg-red-500 transition-all">ลบเลย</button>
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 py-3 rounded-2xl bg-slate-800 border border-slate-700 text-slate-300 text-sm font-bold hover:bg-slate-700 transition-all">CANCEL</button>
+              <button onClick={deleteAccount} className="flex-1 py-3 rounded-2xl bg-red-600 border border-red-500 text-white text-sm font-bold hover:bg-red-500 transition-all">DELETE</button>
             </div>
           </div>
         </div>
