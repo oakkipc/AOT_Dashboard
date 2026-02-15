@@ -30,6 +30,7 @@ export default function Home() {
     key: 'equity',
     direction: 'desc'
   })
+  const [deleteTarget, setDeleteTarget] = useState<TradingAccount | null>(null)
 
   const fetchGoldPrice = async () => {
     try {
@@ -79,6 +80,15 @@ export default function Home() {
     let direction: 'asc' | 'desc' = 'desc';
     if (sortConfig.key === key && sortConfig.direction === 'desc') direction = 'asc';
     setSortConfig({ key, direction });
+  }
+
+  const deleteAccount = async () => {
+    if (!deleteTarget) return
+    const { error } = await supabase.from('trading_accounts').delete().eq('account_id', deleteTarget.account_id)
+    if (!error) {
+      setAccounts(prev => prev.filter(a => a.account_id !== deleteTarget.account_id))
+    }
+    setDeleteTarget(null)
   }
 
   const isStale = (updatedAt: string) => {
@@ -152,9 +162,10 @@ export default function Home() {
             <table className="w-full text-left border-collapse table-fixed">
               <thead className="bg-slate-950 text-[9px] font-black text-slate-500 border-b border-slate-800">
                 <tr>
-                  <th onClick={() => requestSort('name')} className="p-4 w-[35%] cursor-pointer hover:text-white transition-colors">NAME {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
-                  <th onClick={() => requestSort('equity')} className="p-4 text-right w-[40%] cursor-pointer hover:text-white transition-colors">EQUITY/BAL {sortConfig.key === 'equity' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
-                  <th onClick={() => requestSort('dd')} className="p-4 text-center w-[25%] text-red-400 cursor-pointer hover:text-red-200 transition-colors">DD% {sortConfig.key === 'dd' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                  <th onClick={() => requestSort('name')} className="p-4 w-[30%] cursor-pointer hover:text-white transition-colors">NAME {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                  <th onClick={() => requestSort('equity')} className="p-4 text-right w-[35%] cursor-pointer hover:text-white transition-colors">EQUITY/BAL {sortConfig.key === 'equity' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                  <th onClick={() => requestSort('dd')} className="p-4 text-center w-[20%] text-red-400 cursor-pointer hover:text-red-200 transition-colors">DD% {sortConfig.key === 'dd' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-4 text-center w-[15%]"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/50 text-[11px] md:text-sm">
@@ -165,6 +176,9 @@ export default function Home() {
                       <td className="p-4 overflow-hidden"><p className="font-bold text-white truncate">{acc.account_name}</p><p className="text-[8px] text-slate-500 font-mono">ID: {acc.account_id}</p></td>
                       <td className="p-4 text-right font-mono font-bold"><div className="text-white">{acc.equity.toLocaleString(undefined, {minimumFractionDigits: 2})} <span className="text-[8px] text-slate-500">{acc.is_usc ? 'USC' : 'USD'}</span></div><div className="text-[9px] text-slate-500 opacity-60">{acc.balance.toLocaleString()}</div></td>
                       <td className={`p-4 text-center font-mono font-bold ${dd < 0 ? 'text-red-500' : 'text-emerald-400'}`}>{dd.toFixed(1)}%</td>
+                      <td className="p-4 text-center">
+                        <button onClick={() => setDeleteTarget(acc)} className="px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-[9px] font-black hover:bg-red-500/20 hover:border-red-500/40 transition-all">DEL</button>
+                      </td>
                     </tr>
                   )
                 })}
@@ -213,8 +227,9 @@ export default function Home() {
                     <p className={`${cols >= 3 ? 'text-xl' : 'text-2xl'} font-bold font-mono ${dd < 0 ? 'text-red-500' : 'text-emerald-400'}`}>{dd.toFixed(2)}%</p>
                   </div>
 
-                  <div className="flex justify-between text-[9px] font-bold text-slate-600 border-t border-slate-800/40 pt-4 uppercase">
+                  <div className="flex justify-between items-center text-[9px] font-bold text-slate-600 border-t border-slate-800/40 pt-4 uppercase">
                     <span>LOTS: {acc.total_lots?.toFixed(2) || '0.00'}</span>
+                    <button onClick={() => setDeleteTarget(acc)} className="px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-[8px] font-black hover:bg-red-500/20 hover:border-red-500/40 transition-all">DELETE</button>
                     <span className="font-mono opacity-60">{new Date(acc.updated_at).toLocaleTimeString('th-TH', { hour12: false })}</span>
                   </div>
                 </div>
@@ -223,6 +238,28 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setDeleteTarget(null)}>
+          <div className="bg-slate-900 border-2 border-red-500/30 rounded-3xl p-8 max-w-sm w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="text-center mb-6">
+              <div className="w-14 h-14 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <svg className="w-7 h-7 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+              </div>
+              <h3 className="text-lg font-black text-white uppercase tracking-tight">ยืนยันการลบ</h3>
+              <p className="text-sm text-slate-400 mt-2">คุณต้องการลบพอร์ท</p>
+              <p className="text-base font-black text-red-400 mt-1">{deleteTarget.account_name}</p>
+              <p className="text-[10px] text-slate-500 font-mono mt-1">ID: {deleteTarget.account_id}</p>
+              <p className="text-xs text-slate-500 mt-3">ข้อมูลจะถูกลบออกจากระบบถาวร</p>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 py-3 rounded-2xl bg-slate-800 border border-slate-700 text-slate-300 text-sm font-bold hover:bg-slate-700 transition-all">ยกเลิก</button>
+              <button onClick={deleteAccount} className="flex-1 py-3 rounded-2xl bg-red-600 border border-red-500 text-white text-sm font-bold hover:bg-red-500 transition-all">ลบเลย</button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
