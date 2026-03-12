@@ -23,6 +23,7 @@ export default function Home() {
   const [accounts, setAccounts] = useState<TradingAccount[]>([])
   const [goldPrice, setGoldPrice] = useState<number | null>(null)
   const [btcPrice, setBtcPrice] = useState<number | null>(null)
+  const [thbRate, setThbRate] = useState<number | null>(null)
   const [now, setNow] = useState(new Date())
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
   const [cols, setCols] = useState<number>(3)
@@ -35,14 +36,17 @@ export default function Home() {
 
   const fetchGoldPrice = async () => {
     try {
-      const [goldRes, btcRes] = await Promise.all([
+      const [goldRes, btcRes, thbRes] = await Promise.all([
         fetch('https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT'),
         fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT'),
+        fetch('https://api.frankfurter.app/latest?from=USD&to=THB'),
       ])
       const goldData = await goldRes.json()
       const btcData = await btcRes.json()
+      const thbData = await thbRes.json()
       if (goldData.price) setGoldPrice(parseFloat(goldData.price))
       if (btcData.price) setBtcPrice(parseFloat(btcData.price))
+      if (thbData.rates?.THB) setThbRate(thbData.rates.THB)
     } catch (e) { console.error("Price API Error:", e); }
   }
 
@@ -163,15 +167,33 @@ export default function Home() {
         </div>
 
         {/* PRICE TICKER BAR */}
-        <div className="flex items-center gap-3 mb-4 px-2">
-          <div className="flex items-center gap-2 bg-slate-900/60 border border-slate-800 px-4 py-2 rounded-2xl">
+        <div className="flex flex-wrap items-center gap-3 mb-4 px-2">
+          <div className="flex items-center gap-3 bg-slate-900/60 border border-slate-800 px-4 py-2 rounded-2xl">
             <span className="text-[8px] font-black text-amber-400 tracking-widest">XAUUSD</span>
-            <span className="text-sm font-mono font-bold text-white">{goldPrice?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '---.--'}</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[8px] text-slate-500 font-bold">USD</span>
+              <span className="text-sm font-mono font-bold text-white">{goldPrice?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '---.--'}</span>
+            </div>
+            {thbRate && goldPrice && (
+              <div className="flex items-center gap-1.5 border-l border-slate-700 pl-3">
+                <span className="text-[8px] text-slate-500 font-bold">THB</span>
+                <span className="text-sm font-mono font-bold text-amber-300">{(goldPrice * thbRate).toLocaleString('th-TH', { maximumFractionDigits: 0 })}</span>
+              </div>
+            )}
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
           </div>
-          <div className="flex items-center gap-2 bg-slate-900/60 border border-slate-800 px-4 py-2 rounded-2xl">
+          <div className="flex items-center gap-3 bg-slate-900/60 border border-slate-800 px-4 py-2 rounded-2xl">
             <span className="text-[8px] font-black text-orange-400 tracking-widest">BTCUSDT</span>
-            <span className="text-sm font-mono font-bold text-white">{btcPrice?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '---.--'}</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[8px] text-slate-500 font-bold">USD</span>
+              <span className="text-sm font-mono font-bold text-white">{btcPrice?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '---.--'}</span>
+            </div>
+            {thbRate && btcPrice && (
+              <div className="flex items-center gap-1.5 border-l border-slate-700 pl-3">
+                <span className="text-[8px] text-slate-500 font-bold">THB</span>
+                <span className="text-sm font-mono font-bold text-orange-300">{(btcPrice * thbRate).toLocaleString('th-TH', { maximumFractionDigits: 0 })}</span>
+              </div>
+            )}
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
           </div>
         </div>
