@@ -231,7 +231,7 @@ export default function Home() {
                       </span>
                       <span className={`${color} text-sm md:text-xl font-black`}>{unit}</span>
                     </div>
-                    <div className="mt-2 text-[10px] font-mono font-bold text-slate-500 opacity-60 uppercase">BAL: {acc.balance.toLocaleString()} {unit}</div>
+                    <div className="mt-2 text-[11px] font-mono font-bold text-slate-400 uppercase">BAL: {acc.balance.toLocaleString()} {unit}</div>
                   </div>
 
                   <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800/50 text-center mb-4">
