@@ -22,6 +22,7 @@ const supabase = createClient(
 export default function Home() {
   const [accounts, setAccounts] = useState<TradingAccount[]>([])
   const [goldPrice, setGoldPrice] = useState<number | null>(null)
+  const [btcPrice, setBtcPrice] = useState<number | null>(null)
   const [now, setNow] = useState(new Date())
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
   const [cols, setCols] = useState<number>(3)
@@ -34,10 +35,15 @@ export default function Home() {
 
   const fetchGoldPrice = async () => {
     try {
-      const res = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT');
-      const data = await res.json();
-      if (data.price) setGoldPrice(parseFloat(data.price));
-    } catch (e) { console.error("Gold API Error:", e); }
+      const [goldRes, btcRes] = await Promise.all([
+        fetch('https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT'),
+        fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT'),
+      ])
+      const goldData = await goldRes.json()
+      const btcData = await btcRes.json()
+      if (goldData.price) setGoldPrice(parseFloat(goldData.price))
+      if (btcData.price) setBtcPrice(parseFloat(btcData.price))
+    } catch (e) { console.error("Price API Error:", e); }
   }
 
   const fetchAccounts = async () => {
@@ -132,12 +138,6 @@ export default function Home() {
           <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 w-full md:w-auto">
             <h1 className="text-lg font-black text-white tracking-tighter md:border-r border-slate-700 md:pr-4">AOT TERMINAL</h1>
             
-            <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
-               <span className="text-[8px] font-black text-amber-500 tracking-widest">XAUUSD</span>
-               <span className="text-sm font-mono font-bold text-white">{goldPrice?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '---.--'}</span>
-               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-            </div>
-
             <div className="flex items-center gap-2 bg-slate-950/50 p-1 rounded-2xl border border-slate-800/50">
               <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
                 <button onClick={() => setViewMode('grid')} className={`px-3 py-1.5 rounded-lg text-[9px] font-bold ${viewMode === 'grid' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500'}`}>CARDS</button>
@@ -159,6 +159,20 @@ export default function Home() {
             <p className="text-xl md:text-2xl font-mono font-bold text-white leading-none">
               {totalEquityUSD.toLocaleString(undefined, { minimumFractionDigits: 3 })} <span className="text-xs">USD</span>
             </p>
+          </div>
+        </div>
+
+        {/* PRICE TICKER BAR */}
+        <div className="flex items-center gap-3 mb-4 px-2">
+          <div className="flex items-center gap-2 bg-slate-900/60 border border-slate-800 px-4 py-2 rounded-2xl">
+            <span className="text-[8px] font-black text-amber-400 tracking-widest">XAUUSD</span>
+            <span className="text-sm font-mono font-bold text-white">{goldPrice?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '---.--'}</span>
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+          </div>
+          <div className="flex items-center gap-2 bg-slate-900/60 border border-slate-800 px-4 py-2 rounded-2xl">
+            <span className="text-[8px] font-black text-orange-400 tracking-widest">BTCUSDT</span>
+            <span className="text-sm font-mono font-bold text-white">{btcPrice?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || '---.--'}</span>
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
           </div>
         </div>
 
